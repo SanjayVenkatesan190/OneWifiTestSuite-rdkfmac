@@ -3606,6 +3606,7 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 	hw->offchannel_tx_hw_queue = 4;
 
 	ieee80211_hw_set(hw, SUPPORT_FAST_XMIT);
+	ieee80211_hw_set(hw, SUPPORTS_MULTI_BSSID);
 	ieee80211_hw_set(hw, CHANCTX_STA_CSA);
 	ieee80211_hw_set(hw, SUPPORTS_HT_CCK_RATES);
 	ieee80211_hw_set(hw, QUEUE_CONTROL);
