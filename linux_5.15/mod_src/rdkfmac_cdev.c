@@ -95,7 +95,14 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	}
 
 	entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
+	if(!entry)
+	    return;
+
 	spec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
+	if(!spec) {
+	    kfree(entry);
+	    return;
+	}
 	entry->spec = spec;
 
 	memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
@@ -133,8 +140,10 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 		printk("%s:%d: pushing data to queue, type: %s ops: %s current size: %d\n", __func__, __LINE__,
 			str_spec_type, str_ops, get_list_entries_count_in_char_device());
 	}
+	spin_lock(&g_char_device.lock);
 	list_add(&entry->list_entry, g_char_device.list_tail);
 	g_char_device.list_tail = &entry->list_entry;
+	spin_unlock(&g_char_device.lock);
 
 	wake_up_interruptible(&rdkfmac_rq);
 }
@@ -781,8 +790,9 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 
 static int rdkfmac_open(struct inode *inode, struct file *file)
 {
-
+	spin_lock(&g_char_device.lock);
 	g_char_device.num_inst++;
+	spin_unlock(&g_char_device.lock);
 	printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
 
 	return 0;
@@ -790,12 +800,14 @@ static int rdkfmac_open(struct inode *inode, struct file *file)
 
 static int rdkfmac_release(struct inode *inode, struct file *file)
 {
+	spin_lock(&g_char_device.lock);
 	if (g_char_device.num_inst > 0) {
 		g_char_device.num_inst--;
 	}
+	spin_unlock(&g_char_device.lock);
 
-		printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
-		return 0;
+	printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
+	return 0;
 }
 
 const struct file_operations rdkfmac_fops = {
@@ -819,7 +831,7 @@ int init_rdkfmac_cdev(void)
 	}
 
 	memset(&g_char_device, 0, sizeof(rdkfmac_device_data_t));
-
+    spin_lock_init(&g_char_device.lock);
 	cdev_init(&g_char_device.cdev, &rdkfmac_fops);
 	cdev_add(&g_char_device.cdev, MKDEV(RDKFMAC_MAJOR, 0), 1);
 	g_char_device.class = class_create(THIS_MODULE, RDKFMAC_CLASS_NAME);
@@ -852,10 +864,11 @@ unsigned int get_list_entries_count_in_char_device(void)
 {
 	unsigned count = 0;
 	struct list_head *ptr = &g_char_device.list_head;
-
+    spin_lock(&g_char_device.lock);
 	for (ptr = &g_char_device.list_head; ptr != g_char_device.list_tail; ptr = ptr->next) {
 		count++;
 	}
+    spin_unlock(&g_char_device.lock);
 
 	return count;
 }
@@ -865,8 +878,10 @@ wlan_emu_msg_data_t*pop_from_char_device(void)
 	wlan_emu_msg_data_t *spec = NULL;
 	wlan_emu_msg_data_entry_t *entry = NULL;
 
+	spin_lock(&g_char_device.lock);
 	if (g_char_device.list_tail == &g_char_device.list_head) {
 		printk("%s:%d list is empty\n", __func__, __LINE__);
+		spin_unlock(&g_char_device.lock);
 		return NULL;
 	}
 
@@ -874,7 +889,7 @@ wlan_emu_msg_data_t*pop_from_char_device(void)
 
 	g_char_device.list_tail= g_char_device.list_tail->prev;
 	list_del(&entry->list_entry);
-
+    spin_unlock(&g_char_device.lock);
 	spec = entry->spec;
 	kfree(entry);
 
