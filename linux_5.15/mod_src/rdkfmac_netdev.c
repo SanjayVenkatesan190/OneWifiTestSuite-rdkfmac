@@ -828,10 +828,11 @@ static void handle_frame_assoc_resp(struct ieee80211_mgmt *assoc_resp, unsigned 
 
 static void push_frame_to_char_dev(void *data, unsigned int len)
 {
-	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	unsigned int frame_len = 0;
 	u16 fc;
 	struct ieee80211_mgmt *mgmt;
+
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 
 	if (data == NULL) {
 		printk("%s:%d Invalid data \n", __func__, __LINE__);

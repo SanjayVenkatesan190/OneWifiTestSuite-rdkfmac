@@ -80,12 +80,12 @@ static unsigned int rdkfmac_poll(struct file *filp, struct poll_table_struct *wa
 
 void push_to_char_device(wlan_emu_msg_data_t *data)
 {
-	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_entry_t	*entry;
 	wlan_emu_msg_data_t	*spec;
 	char	str_spec_type[32];
 	char	str_ops[128];
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	// do not push to list if nobody is listening
 	if (g_char_device.num_inst == 0) {
 		return;
@@ -94,14 +94,14 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	if (rdkfmac_emu80211_close == true)  {
 		return;
 	}
-	printk("SJY Allocating entry wlan_emu_msg_data_entry_t of size: %lu\n", sizeof(wlan_emu_msg_data_entry_t));
+	printk("SJY Allocating entry wlan_emu_msg_data_entry_t of size: %zu\n", sizeof(wlan_emu_msg_data_entry_t));
 
 	entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
 	if (entry == NULL) {
 		printk("SJY kmalloc failed for entry\n");
 	}
 
-	printk("SJY Allocating spec wlan_emu_msg_data_t of size: %lu\n", sizeof(wlan_emu_msg_data_t));
+	printk("SJY Allocating spec wlan_emu_msg_data_t of size: %zu\n", sizeof(wlan_emu_msg_data_t));
 
 	spec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (spec == NULL) {
@@ -311,7 +311,6 @@ static void handle_agent_msg_w(wlan_emu_msg_data_t *spec) {
 }
 
 static void handle_frm80211_msg_w(char *read_buff, size_t size) {
-	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_t *frm80211_msg;
 	struct ieee80211_hdr *hdr;
 	unsigned int msg_ops_type = 0;
@@ -320,6 +319,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
 	unsigned char *tmp_frame_buf;
 	unsigned int data_header_len = 0;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	frm80211_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (frm80211_msg == NULL) {
 		printk("%s:%d NULL Pointer\n", __func__, __LINE__);
@@ -441,11 +441,11 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
 static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 					size_t size, loff_t * offset)
 {
-	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_t *pSpec;
 	ssize_t sz;
 	char *read_buff;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	pSpec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (pSpec == NULL) {
 		printk("SJY %s:%d kmalloc failed for pSpec\n", __func__, __LINE__);
@@ -763,11 +763,13 @@ static void handle_frm80211_msg(wlan_emu_msg_data_t *spec, ssize_t *len, u8 *s_t
 static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 		size_t size, loff_t *offset)
 {
-	printk("SJY Entering %s:%d\n", __func__, __LINE__);
+
 	wlan_emu_msg_data_t *spec;
 	ssize_t return_len = 0;
 	char *send_buff;
 	u8 *s_tmp;
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
+	
     printk("SJY %s:%d: Calling pop_from_char_device and current size of list is %d\n", __func__, __LINE__, get_list_entries_count_in_char_device());
 	spec = pop_from_char_device();
 	if (spec == NULL) {
