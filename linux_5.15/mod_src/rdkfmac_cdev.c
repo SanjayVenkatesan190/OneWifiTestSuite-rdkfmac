@@ -80,6 +80,7 @@ static unsigned int rdkfmac_poll(struct file *filp, struct poll_table_struct *wa
 
 void push_to_char_device(wlan_emu_msg_data_t *data)
 {
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_entry_t	*entry;
 	wlan_emu_msg_data_t	*spec;
 	char	str_spec_type[32];
@@ -93,31 +94,46 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	if (rdkfmac_emu80211_close == true)  {
 		return;
 	}
+	printk("SJY Allocating entry wlan_emu_msg_data_entry_t of size: %lu\n", sizeof(wlan_emu_msg_data_entry_t));
 
 	entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
-	spec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
-	entry->spec = spec;
+	if (entry == NULL) {
+		printk("SJY kmalloc failed for entry\n");
+	}
 
+	printk("SJY Allocating spec wlan_emu_msg_data_t of size: %lu\n", sizeof(wlan_emu_msg_data_t));
+
+	spec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
+	if (spec == NULL) {
+		printk("SJY kmalloc failed for spec\n");
+	}
+	entry->spec = spec;
+    printk("SJY doing memcpy for spec\n");
 	memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
+	printk("SJY memcpy done for spec and spec->type is %d\n", spec->type);
 
 	switch (spec->type) {
 		case wlan_emu_msg_type_cfg80211:
 			strcpy(str_spec_type, "cfg80211");
+			printk("SJY cfg80211 ops: %d\n", spec->u.cfg80211.ops);
 			strcpy(str_ops, rdkfmac_cfg80211_ops_type_to_string(spec->u.cfg80211.ops));
 			break;
 
 		case wlan_emu_msg_type_mac80211:
 			strcpy(str_spec_type, "mac80211");
+			printk("SJY mac80211 ops: %d\n", spec->u.mac80211.ops);
 			strcpy(str_ops, rdkfmac_mac80211_ops_type_to_string(spec->u.mac80211.ops));
 			break;
 
 		case wlan_emu_msg_type_emu80211:
 			strcpy(str_spec_type, "emu80211");
+			printk("SJY emu80211 ops: %d\n", spec->u.emu80211.ops);
 			strcpy(str_ops, rdkfmac_emu80211_ops_type_to_string(spec->u.emu80211.ops));
 			break;
 
 		case wlan_emu_msg_type_webconfig:
 			strcpy(str_spec_type, "webconfig");
+			printk("SJY webconfig ops: %s\n", str_ops);
 			strcpy(str_ops, "onewifi_webconfig");
 			break;
 
@@ -134,9 +150,12 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 			str_spec_type, str_ops, get_list_entries_count_in_char_device());
 	}
 	list_add(&entry->list_entry, g_char_device.list_tail);
+	printk("SJY Adding the spec entry to global list tail\n");
 	g_char_device.list_tail = &entry->list_entry;
+	printk("SJY manually added latest entry as tail of list");
 
 	wake_up_interruptible(&rdkfmac_rq);
+	printk("SJY Woke up the wait queue\n");
 }
 
 void push_to_rdkfmac_device(wlan_emu_msg_data_t *data)
@@ -251,9 +270,11 @@ static void handle_emu80211_msg_w(wlan_emu_msg_data_t *spec) {
 			} else if (spec->u.emu80211.u.ctrl.ctrl == wlan_emu_emu80211_ctrl_tstop) {
 				rdkfmac_emu80211_close = true;
 			}
+			printk("SJY Calling push_to_char_device from %s:%d for emu80211 tctrl ops\n", __func__, __LINE__);
 			push_to_char_device(spec);
 			break;
 		case wlan_emu_emu80211_ops_type_close:
+		    printk("SJY Calling push_to_char_device from %s:%d for emu80211 close ops\n", __func__, __LINE__);
 			push_to_char_device(spec);
 			break;
 		case wlan_emu_emu80211_ops_type_cmnd:
@@ -290,6 +311,7 @@ static void handle_agent_msg_w(wlan_emu_msg_data_t *spec) {
 }
 
 static void handle_frm80211_msg_w(char *read_buff, size_t size) {
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_t *frm80211_msg;
 	struct ieee80211_hdr *hdr;
 	unsigned int msg_ops_type = 0;
@@ -407,8 +429,9 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
 	}
 
 	//updating the final correct value
+	printk("SJY Memcpying the correct ops type %d to frm80211_msg\n", msg_ops_type);
 	memcpy(&frm80211_msg->u.frm80211.ops, &msg_ops_type, sizeof(wlan_emu_cfg80211_ops_type_t));
-
+    printk("SJY Calling push_to_char_device from %s:%d for frm80211 ops\n", __func__, __LINE__);
 	push_to_char_device(frm80211_msg);
 	kfree(frm80211_msg);
 	return;
@@ -418,12 +441,19 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
 static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 					size_t size, loff_t * offset)
 {
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_t *pSpec;
 	ssize_t sz;
 	char *read_buff;
 
 	pSpec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
+	if (pSpec == NULL) {
+		printk("SJY %s:%d kmalloc failed for pSpec\n", __func__, __LINE__);
+	}
 	read_buff = kmalloc(size, GFP_KERNEL);
+	if (read_buff == NULL) {
+		printk("SJY %s:%d kmalloc failed for read_buff\n", __func__, __LINE__);
+	}
 	memset(read_buff, 0, size);
 	if (copy_from_user(read_buff, user_buffer, size)) {
 		printk("%s:%d: potential copy error\n", __func__, __LINE__);
@@ -431,8 +461,9 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 		kfree(read_buff);
 		return 0;
 	}
-
+    printk("SJY Calling memcpy and the size of wlan_emu_msg_type_t is %d\n", sizeof(wlan_emu_msg_type_t));
 	memcpy((char*)&pSpec->type, read_buff, sizeof(wlan_emu_msg_type_t));
+	printk("SJY The pspec->type is %d", pSpec->type);
 	switch (pSpec->type) {
 		case wlan_emu_msg_type_frm80211:
 			handle_frm80211_msg_w(read_buff, size);
@@ -445,6 +476,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 			break;
 		case wlan_emu_msg_type_webconfig:
 			memcpy(pSpec, read_buff, sizeof(wlan_emu_msg_data_t));
+			printk("SJY Calling push_to_char_device from %s:%d for webconfig ops\n", __func__, __LINE__);
 			push_to_char_device(pSpec);
 			sz = sizeof(wlan_emu_msg_data_t);
 			break;
@@ -461,6 +493,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 
 	kfree(read_buff);
 	kfree(pSpec);
+	printk("SJY Exit\n");
 	return sz;
 }
 
@@ -730,17 +763,23 @@ static void handle_frm80211_msg(wlan_emu_msg_data_t *spec, ssize_t *len, u8 *s_t
 static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 		size_t size, loff_t *offset)
 {
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	wlan_emu_msg_data_t *spec;
 	ssize_t return_len = 0;
 	char *send_buff;
 	u8 *s_tmp;
-
+    printk("SJY %s:%d: Calling pop_from_char_device and current size of list is %d\n", __func__, __LINE__, get_list_entries_count_in_char_device());
 	spec = pop_from_char_device();
 	if (spec == NULL) {
 		return 0;
 	}
 	send_buff = kmalloc(size, GFP_KERNEL);
+	if(send_buff == NULL) {
+		printk("SJY %s:%d kmalloc failed for send_buff\n", __func__, __LINE__);
+	}
 	memset(send_buff, 0, size);
+	s_tmp = send_buff;
+    printk("SJY spec->type is %d\n", spec->type);
 	s_tmp = send_buff;
 
 	switch (spec->type) {
@@ -762,9 +801,9 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 		default:
 			break;
 	}
-
+    printk("SJY Calling copy_to_user \n");
 	if (copy_to_user(user_buffer, send_buff, return_len)) {
-		printk("%s: copy_to_user failed\n", __func__);
+		printk("SJY %s: copy_to_user failed\n", __func__);
 		return -EFAULT;
 	}
 
@@ -775,7 +814,7 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 
 	kfree(spec);
 	kfree(send_buff);
-
+    printk("SJY returning from %s:%d and return_len is %d\n", __func__, __LINE__, return_len);
 	return return_len;
 }
 

@@ -647,6 +647,7 @@ DEFINE_DEBUGFS_ATTRIBUTE(hwsim_fops_group,
 static void handle_frame_probe_req(struct ieee80211_mgmt *probe_req, unsigned int probe_req_len) {
 	wlan_emu_msg_data_t *add_probe_req_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_probe_req_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_probe_req_msg) {
 		return;
@@ -661,6 +662,7 @@ static void handle_frame_probe_req(struct ieee80211_mgmt *probe_req, unsigned in
 		memcpy(add_probe_req_msg->u.frm80211.u.frame.frame, probe_req, probe_req_len);
 		memcpy(add_probe_req_msg->u.frm80211.u.frame.macaddr, probe_req->bssid, ETH_ALEN);
 		memcpy(add_probe_req_msg->u.frm80211.u.frame.client_macaddr, probe_req->sa, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for probe req ops\n", __func__, __LINE__);
 		push_to_char_device(add_probe_req_msg);
 	}
 
@@ -671,6 +673,7 @@ static void handle_frame_probe_req(struct ieee80211_mgmt *probe_req, unsigned in
 static void handle_frame_probe_resp(struct ieee80211_mgmt *probe_resp, unsigned int probe_resp_len) {
 	wlan_emu_msg_data_t *add_probe_resp_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_probe_resp_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_probe_resp_msg) {
 		return;
@@ -685,6 +688,7 @@ static void handle_frame_probe_resp(struct ieee80211_mgmt *probe_resp, unsigned 
 		memcpy(add_probe_resp_msg->u.frm80211.u.frame.frame, probe_resp, probe_resp_len);
 		memcpy(add_probe_resp_msg->u.frm80211.u.frame.macaddr, probe_resp->bssid, ETH_ALEN);
 		memcpy(add_probe_resp_msg->u.frm80211.u.frame.client_macaddr, probe_resp->da, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for probe resp ops\n", __func__, __LINE__);
 		push_to_char_device(add_probe_resp_msg);
 	}
 
@@ -695,6 +699,7 @@ static void handle_frame_probe_resp(struct ieee80211_mgmt *probe_resp, unsigned 
 static void handle_frame_assoc_req(struct ieee80211_mgmt *assoc_req, unsigned int assoc_req_len) {
 	wlan_emu_msg_data_t *add_assoc_req_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_assoc_req_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_assoc_req_msg) {
 		return;
@@ -709,6 +714,7 @@ static void handle_frame_assoc_req(struct ieee80211_mgmt *assoc_req, unsigned in
 		memcpy(add_assoc_req_msg->u.frm80211.u.frame.frame, assoc_req, assoc_req_len);
 		memcpy(add_assoc_req_msg->u.frm80211.u.frame.macaddr, assoc_req->bssid, ETH_ALEN);
 		memcpy(add_assoc_req_msg->u.frm80211.u.frame.client_macaddr, assoc_req->sa, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for assoc req ops\n", __func__, __LINE__);
 		push_to_char_device(add_assoc_req_msg);
 	}
 
@@ -719,6 +725,7 @@ static void handle_frame_assoc_req(struct ieee80211_mgmt *assoc_req, unsigned in
 static void handle_frame_auth(struct ieee80211_mgmt *auth, unsigned int auth_len) {
 	wlan_emu_msg_data_t *add_auth_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_auth_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_auth_msg) {
 		return;
@@ -733,6 +740,7 @@ static void handle_frame_auth(struct ieee80211_mgmt *auth, unsigned int auth_len
 		memcpy(add_auth_msg->u.frm80211.u.frame.frame, auth, auth_len);
 		memcpy(add_auth_msg->u.frm80211.u.frame.macaddr, auth->bssid, ETH_ALEN);
 		memcpy(add_auth_msg->u.frm80211.u.frame.client_macaddr, auth->da, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for auth ops\n", __func__, __LINE__);
 		push_to_char_device(add_auth_msg);
 	}
 
@@ -743,6 +751,7 @@ static void handle_frame_auth(struct ieee80211_mgmt *auth, unsigned int auth_len
 static void handle_frame_deauth(struct ieee80211_mgmt *deauth, unsigned int deauth_len) {
 	wlan_emu_msg_data_t *add_deauth_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_deauth_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_deauth_msg) {
 		return;
@@ -757,6 +766,7 @@ static void handle_frame_deauth(struct ieee80211_mgmt *deauth, unsigned int deau
 		memcpy(add_deauth_msg->u.frm80211.u.frame.frame, deauth, deauth_len);
 		memcpy(add_deauth_msg->u.frm80211.u.frame.macaddr, deauth->bssid, ETH_ALEN);
 		memcpy(add_deauth_msg->u.frm80211.u.frame.client_macaddr, deauth->da, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for deauth ops\n", __func__, __LINE__);
 		push_to_char_device(add_deauth_msg);
 	}
 
@@ -767,6 +777,7 @@ static void handle_frame_deauth(struct ieee80211_mgmt *deauth, unsigned int deau
 static void handle_frame_disassoc(struct ieee80211_mgmt *disassoc, unsigned int disassoc_len) {
 	wlan_emu_msg_data_t *add_disassoc_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_disassoc_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_disassoc_msg) {
 		return;
@@ -781,6 +792,7 @@ static void handle_frame_disassoc(struct ieee80211_mgmt *disassoc, unsigned int 
 		memcpy(add_disassoc_msg->u.frm80211.u.frame.frame, disassoc, disassoc_len);
 		memcpy(add_disassoc_msg->u.frm80211.u.frame.macaddr, disassoc->bssid, ETH_ALEN);
 		memcpy(add_disassoc_msg->u.frm80211.u.frame.client_macaddr, disassoc->da, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for disassoc ops\n", __func__, __LINE__);
 		push_to_char_device(add_disassoc_msg);
 	}
 
@@ -791,6 +803,7 @@ static void handle_frame_disassoc(struct ieee80211_mgmt *disassoc, unsigned int 
 static void handle_frame_assoc_resp(struct ieee80211_mgmt *assoc_resp, unsigned int assoc_resp_len) {
 	wlan_emu_msg_data_t *add_assoc_resp_msg;
 
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	add_assoc_resp_msg = kzalloc(sizeof(wlan_emu_msg_data_t), GFP_KERNEL);
 	if (!add_assoc_resp_msg) {
 		return;
@@ -805,6 +818,7 @@ static void handle_frame_assoc_resp(struct ieee80211_mgmt *assoc_resp, unsigned 
 		memcpy(add_assoc_resp_msg->u.frm80211.u.frame.frame, assoc_resp, assoc_resp_len);
 		memcpy(add_assoc_resp_msg->u.frm80211.u.frame.macaddr, assoc_resp->bssid, ETH_ALEN);
 		memcpy(add_assoc_resp_msg->u.frm80211.u.frame.client_macaddr, assoc_resp->da, ETH_ALEN);
+		printk("SJY Calling push_to_char_device from %s:%d for assoc resp ops\n", __func__, __LINE__);
 		push_to_char_device(add_assoc_resp_msg);
 	}
 
@@ -814,6 +828,7 @@ static void handle_frame_assoc_resp(struct ieee80211_mgmt *assoc_resp, unsigned 
 
 static void push_frame_to_char_dev(void *data, unsigned int len)
 {
+	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	unsigned int frame_len = 0;
 	u16 fc;
 	struct ieee80211_mgmt *mgmt;
@@ -829,7 +844,7 @@ static void push_frame_to_char_dev(void *data, unsigned int len)
 	if (mgmt) {
 		fc = mgmt->frame_control;
 
-		printk("%s:%d FC: %d Frame type %d Subtype %d frame_len %d\n", __func__, __LINE__, fc, WLAN_FC_GET_TYPE(fc), WLAN_FC_GET_STYPE(fc), frame_len);
+		printk("SJY %s:%d FC: %d Frame type %d Subtype %d frame_len %d\n", __func__, __LINE__, fc, WLAN_FC_GET_TYPE(fc), WLAN_FC_GET_STYPE(fc), frame_len);
 
 		switch (WLAN_FC_GET_STYPE(fc)) {
 			case WLAN_FC_STYPE_PROBE_REQ:
