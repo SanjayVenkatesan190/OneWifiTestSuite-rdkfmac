@@ -88,10 +88,12 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	// do not push to list if nobody is listening
 	if (g_char_device.num_inst == 0) {
+		printk("SJY No listeners for char device, not pushing data to list\n");
 		return;
 	}
 
 	if (rdkfmac_emu80211_close == true)  {
+		printk("SJY emu80211 is closed, not pushing data to list\n");
 		return;
 	}
 	printk("SJY Allocating entry wlan_emu_msg_data_entry_t of size: %zu\n", sizeof(wlan_emu_msg_data_entry_t));
