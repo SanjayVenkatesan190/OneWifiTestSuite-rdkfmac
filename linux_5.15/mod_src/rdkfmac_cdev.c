@@ -461,7 +461,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 		kfree(read_buff);
 		return 0;
 	}
-    printk("SJY Calling memcpy and the size of wlan_emu_msg_type_t is %d\n", sizeof(wlan_emu_msg_type_t));
+    printk("SJY Calling memcpy and the size of wlan_emu_msg_type_t is %zu\n", sizeof(wlan_emu_msg_type_t));
 	memcpy((char*)&pSpec->type, read_buff, sizeof(wlan_emu_msg_type_t));
 	printk("SJY The pspec->type is %d", pSpec->type);
 	switch (pSpec->type) {
@@ -816,7 +816,7 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
 
 	kfree(spec);
 	kfree(send_buff);
-    printk("SJY returning from %s:%d and return_len is %d\n", __func__, __LINE__, return_len);
+    printk("SJY returning from %s:%d and return_len is %zd\n", __func__, __LINE__, return_len);
 	return return_len;
 }
 
