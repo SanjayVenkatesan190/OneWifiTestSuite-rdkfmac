@@ -87,10 +87,10 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     wlan_emu_msg_data_entry_t *entry;
     wlan_emu_msg_data_t *spec;
     unsigned long flags;
-	char	str_spec_type[32];
-	char	str_ops[128];
+	char	str_spec_type[32] = {0};
+	char	str_ops[128] = {0};
+
     printk("SJY Entering %s:%d\n", __func__, __LINE__);
-    
 
     // 1. Pre-allocate memory (can sleep, so do it OUTSIDE the lock)
     entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
@@ -113,11 +113,13 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     // 2. Lock and Update
 	printk("SJY %s:%d: Acquiring lock to push data to char device\n", __func__, __LINE__);
     spin_lock_irqsave(&g_char_device.lock, flags);
+
 	if (g_char_device.num_inst == 0 || rdkfmac_emu80211_close == true) {
 		printk("%s:%d SJY Not pushing to char device, num_inst: %d, rdkfmac_emu80211_close: %d\n", __func__, __LINE__, g_char_device.num_inst, rdkfmac_emu80211_close);
 		spin_unlock_irqrestore(&g_char_device.lock, flags);
-		free(entry);
-		free(spec);
+		entry->spec = NULL;
+		kfree(entry);
+		kfree(spec);
         return;
     }
     printk("SJY %s:%d: the spec type is %d\n", __func__, __LINE__, spec->type);
@@ -162,6 +164,8 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     printk("SJY %s:%d: Released lock after pushing data to char device and calling interrupt\n", __func__, __LINE__);
     // 3. Signal CCI
     wake_up_interruptible(&rdkfmac_rq);
+	printk("SJY %s:%d: Exit\n", __func__, __LINE__);
+	return;
 }
 
 void push_to_rdkfmac_device(wlan_emu_msg_data_t *data)
