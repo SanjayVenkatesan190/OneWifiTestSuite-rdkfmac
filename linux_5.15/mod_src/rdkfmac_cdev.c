@@ -7,7 +7,7 @@
 struct rdkfmac_device_data g_char_device;
 static DECLARE_WAIT_QUEUE_HEAD(rdkfmac_rq); 
 static wlan_emu_msg_data_t *pop_from_char_device(void);
-static unsigned int get_list_entries_count_in_char_device(void);
+// static unsigned int get_list_entries_count_in_char_device(void);
 static bool  rdkfmac_emu80211_close = true;
 
 const char *rdkfmac_cfg80211_ops_type_to_string(wlan_emu_cfg80211_ops_type_t type)
@@ -78,7 +78,7 @@ static __poll_t rdkfmac_poll(struct file *filp, struct poll_table_struct *wait)
         mask |= EPOLLIN | EPOLLRDNORM;
     }
     spin_unlock_irqrestore(&g_char_device.lock, flags);
-    printk("SJY Exiting poll and returning mask : %d\n", __func__, __LINE__, mask);
+    printk("SJY %s:%d: Exiting poll and returning mask : %u\n", __func__, __LINE__, mask);
     return mask;
 }
 
@@ -90,10 +90,7 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	char	str_spec_type[32];
 	char	str_ops[128];
     printk("SJY Entering %s:%d\n", __func__, __LINE__);
-    if (g_char_device.num_inst == 0 || rdkfmac_emu80211_close == true) {
-		printk("%s:%d SJY Not pushing to char device, num_inst: %d, rdkfmac_emu80211_close: %d\n", __func__, __LINE__, g_char_device.num_inst, rdkfmac_emu80211_close);
-        return;
-    }
+    
 
     // 1. Pre-allocate memory (can sleep, so do it OUTSIDE the lock)
     entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
@@ -116,6 +113,13 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     // 2. Lock and Update
 	printk("SJY %s:%d: Acquiring lock to push data to char device\n", __func__, __LINE__);
     spin_lock_irqsave(&g_char_device.lock, flags);
+	if (g_char_device.num_inst == 0 || rdkfmac_emu80211_close == true) {
+		printk("%s:%d SJY Not pushing to char device, num_inst: %d, rdkfmac_emu80211_close: %d\n", __func__, __LINE__, g_char_device.num_inst, rdkfmac_emu80211_close);
+		spin_unlock_irqrestore(&g_char_device.lock, flags);
+		free(entry);
+		free(spec);
+        return;
+    }
     printk("SJY %s:%d: the spec type is %d\n", __func__, __LINE__, spec->type);
 		switch (spec->type) {
 		case wlan_emu_msg_type_cfg80211:
@@ -143,8 +147,8 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	}
 
 	if ((spec->type != wlan_emu_msg_type_webconfig) && (spec->type != wlan_emu_msg_type_frm80211)) {
-		printk("SJY %s:%d: pushing data to queue, type: %s ops: %s current size: %d\n", __func__, __LINE__,
-			str_spec_type, str_ops, get_list_entries_count_in_char_device());
+		printk("SJY %s:%d: pushing data to queue, type: %s ops: %s\n", __func__, __LINE__,
+			str_spec_type, str_ops);
 	}
 
     // Link node to the current tail
@@ -900,18 +904,15 @@ void cleanup_rdkfmac_cdev(void)
 	printk(KERN_INFO "%s:%d: unregistered successfully\n", __func__, __LINE__);
 }
 
-unsigned int get_list_entries_count_in_char_device(void)
+/*(void)
 {
 	unsigned count = 0;
 	struct list_head *ptr = &g_char_device.list_head;
-    spin_lock(&g_char_device.lock);
 	for (ptr = &g_char_device.list_head; ptr != g_char_device.list_tail; ptr = ptr->next) {
 		count++;
 	}
-    spin_unlock(&g_char_device.lock);
-
 	return count;
-}
+} */
 
 wlan_emu_msg_data_t* pop_from_char_device(void)
 {
