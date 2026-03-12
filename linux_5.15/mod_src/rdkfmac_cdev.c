@@ -478,7 +478,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 	printk("SJY %s:%d: The pspec->type is %d\n", __func__, __LINE__, pSpec->type);
 	switch (pSpec->type) {
 		case wlan_emu_msg_type_frm80211:
-		    printk("SJY %s:%d Calling handle_frm80211_msg_w for frm80211 ops and push would be called\n");
+		    printk("SJY %s:%d Calling handle_frm80211_msg_w for frm80211 ops and push would be called\n", __func__, __LINE__);
 			handle_frm80211_msg_w(read_buff, size);
 			sz = size;
 			break;
@@ -940,7 +940,7 @@ wlan_emu_msg_data_t* pop_from_char_device(void)
     g_char_device.list_tail = g_char_device.list_tail->prev;
     
     // Unlink the node (kernel poisons the pointers here safely under lock)
-	printk("SJY deleting the list entry\n", __func__, __LINE__);
+	printk("SJY %s:%d deleting the list entry\n", __func__, __LINE__);
     list_del(&entry->list_entry);
 
     spin_unlock_irqrestore(&g_char_device.lock, flags);
