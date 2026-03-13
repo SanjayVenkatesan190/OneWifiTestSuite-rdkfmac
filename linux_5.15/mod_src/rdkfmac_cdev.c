@@ -338,11 +338,12 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size)
     unsigned char *tmp_frame_buf;
     unsigned int data_header_len = 0;
     size_t consumed = 0;
+	size_t min_required;
 
     printk("SJY Entering %s:%d\n", __func__, __LINE__);
 
     // 1. Minimum Size Check: Enough for fixed headers?
-    size_t min_required = sizeof(wlan_emu_msg_type_t) + 
+    min_required = sizeof(wlan_emu_msg_type_t) + 
                           sizeof(wlan_emu_cfg80211_ops_type_t) + 
                           sizeof(unsigned int) + (ETH_ALEN * 2);
 
@@ -482,6 +483,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 	wlan_emu_msg_data_t *pSpec;
 	ssize_t sz;
 	char *read_buff;
+	size_t actual_copy_size;
 
 	printk("SJY Entering %s:%d\n", __func__, __LINE__);
 	if (size < sizeof(wlan_emu_msg_type_t)) {
@@ -508,7 +510,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
 	}
     printk("SJY %s:%d: Calling memcpy and the size of wlan_emu_msg_type_t and user space size is %zu and %zu respectively\n", __func__, __LINE__, sizeof(wlan_emu_msg_type_t), size);
 
-	size_t actual_copy_size = min_t(size_t, size, sizeof(wlan_emu_msg_data_t));
+	actual_copy_size = min_t(size_t, size, sizeof(wlan_emu_msg_data_t));
 
 	memcpy(pSpec, read_buff, actual_copy_size);
 	printk("SJY %s:%d: The pspec->type is %d\n", __func__, __LINE__, pSpec->type);
