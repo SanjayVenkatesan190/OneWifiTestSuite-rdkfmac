@@ -145,7 +145,6 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 
 		case wlan_emu_msg_type_webconfig:
 			strcpy(str_spec_type, "webconfig");
-			printk("SJY webconfig ops: %d\n", spec->u.webconfig.ops);
 			strcpy(str_ops, "onewifi_webconfig");
 			break;
 
@@ -336,6 +335,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     const unsigned char rfc1042_hdr[ETH_ALEN] = { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00 };
     unsigned char *tmp_frame_buf;
     unsigned int data_header_len = 0;
+	unsigned int f_len = 0;
     char *end_of_buff = read_buff + size; /* Safety boundary */
 
     /* [HND CP 1] Entry Check */
@@ -378,7 +378,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     read_buff += ETH_ALEN;
 
     /* [HND CP 4] Nested Allocation */
-    unsigned int f_len = frm80211_msg->u.frm80211.u.frame.frame_len;
+    f_len = frm80211_msg->u.frm80211.u.frame.frame_len;
     printk("SJY: [HND CP 4] Allocating frame buffer of size: %u\n", f_len);
     
     if (f_len > 4000) { /* Sane limit check */
@@ -819,6 +819,7 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
     ssize_t return_len = 0;
     char *send_buff;
     u8 *s_tmp;
+	int list_count = 0;
 
     /* [RD CP 1] Entry Check */
     printk("SJY: [RD CP 1] Entering %s. User buffer: %p, available size: %zu\n", __func__, user_buffer, size);
@@ -826,7 +827,7 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
     /* [RD CP 2] Count Check - HIGH RISK 
        If it crashes here, the linked list is circular or corrupted. */
     printk("SJY: [RD CP 2] Calling count check\n");
-    int list_count = get_list_entries_count_in_char_device();
+    list_count = get_list_entries_count_in_char_device();
     printk("SJY: [RD CP 3] Current list size is %d\n", list_count);
 
     /* [RD CP 4] Popping Data - HIGH RISK 
