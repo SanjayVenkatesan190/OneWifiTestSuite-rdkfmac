@@ -90,19 +90,29 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 		return; 
 	}
 
+	printk("SJYC QUEUE push\n");
     printk("SJY: [CP 1] Entering %s. data_ptr=%p\n", __func__, data);
 
 	// do not push to list if nobody is listening
-	if (g_char_device.num_inst == 0) {
-		printk("SJY No listeners for char device, not pushing data to list\n");
-		return;
-	}
+    if (g_char_device.num_inst == 0) {
+      printk("No listeners\n");
 
+      if (data->type == wlan_emu_msg_type_frm80211)
+        kfree(data->u.frm80211.u.frame.frame);
 
-	if (rdkfmac_emu80211_close == true)  {
-		printk("SJY emu80211 is closed, not pushing data to list\n");
-		return;
-	}
+      kfree(data);
+      return;
+    }
+
+    if (rdkfmac_emu80211_close == true) {
+      printk("emu80211 closed\n");
+
+      if (data->type == wlan_emu_msg_type_frm80211)
+        kfree(data->u.frm80211.u.frame.frame);
+
+      kfree(data);
+      return;
+    }
 
     printk("SJY: [CP 2] Allocating memory blocks\n");
 	entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_KERNEL);
@@ -122,9 +132,40 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	entry->spec = spec;
     printk("SJY %s: [CP 5] Before main memcpy. src=%p dest=%p\n", __func__, data, spec);
 	memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
-	printk("SJY: [CP 6] memcpy success and spec->type is %d\n", spec->type);
 
-	switch (spec->type) {
+        /* ===== FIX: deep copy frame buffer ===== */
+        if (spec->type == wlan_emu_msg_type_frm80211 &&
+            data->u.frm80211.u.frame.frame != NULL &&
+            data->u.frm80211.u.frame.frame_len > 0) {
+
+          u32 len = data->u.frm80211.u.frame.frame_len;
+
+          if (len == 0 || len > 4096) {
+            printk("SJY invalid frame length %u\n", len);
+            kfree(spec);
+            kfree(entry);
+            return;
+          }
+
+          spec->u.frm80211.u.frame.frame = kmalloc(len, GFP_KERNEL);
+          if (!spec->u.frm80211.u.frame.frame) {
+            printk("SJY sep kmalloc failed for frame buffer\n");
+            kfree(spec);
+            kfree(entry);
+            return;
+          }
+
+          memcpy(spec->u.frm80211.u.frame.frame, data->u.frm80211.u.frame.frame,
+                 len);
+        }
+
+        printk("SJYC orig frame=%p copy frame=%p len=%u\n",
+               data->u.frm80211.u.frame.frame, spec->u.frm80211.u.frame.frame,
+               spec->u.frm80211.u.frame.frame_len);
+
+        printk("SJY: [CP 6] memcpy success and spec->type is %d\n", spec->type);
+
+        switch (spec->type) {
 		case wlan_emu_msg_type_cfg80211:
 			strcpy(str_spec_type, "cfg80211");
 			printk("SJY cfg80211 ops: %d\n", spec->u.cfg80211.ops);
@@ -171,7 +212,8 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     printk("SJY: [CP 10] List update success. Waking queue.\n");
 	wake_up_interruptible(&rdkfmac_rq);
 
-    printk("SJY: [CP 11] Exit successful.\n");}
+    printk("SJY: [CP 11] Exit successful.\n");
+}
 
 void push_to_rdkfmac_device(wlan_emu_msg_data_t *data)
 {
@@ -338,6 +380,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
 	unsigned int f_len = 0;
     char *end_of_buff = read_buff + size; /* Safety boundary */
 
+	printk("SJYC HANDLE FRM80211 start\n");
     /* [HND CP 1] Entry Check */
     printk("SJY: [HND CP 1] Entering %s. buff=%p, total_size=%zu\n", __func__, read_buff, size);
 
@@ -346,6 +389,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
         printk("SJY: [HND ERR] kzalloc failed for frm80211_msg\n");
         return;
     }
+
 
     /* [HND CP 2] Type Header Extraction */
     if (read_buff + sizeof(wlan_emu_msg_type_t) > end_of_buff) goto oob_error;
@@ -441,13 +485,13 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     /* [HND CP 7] Final Dispatch */
     printk("SJY: [HND CP 7] Final ops type %d. Calling push_to_char_device\n", msg_ops_type);
     memcpy(&frm80211_msg->u.frm80211.ops, &msg_ops_type, sizeof(wlan_emu_cfg80211_ops_type_t));
-    
+    printk("SJYC PUSH start frame_len from %s\n", __func__);
     push_to_char_device(frm80211_msg);
 
     /* [HND CP 8] Exit Cleanup */
     printk("SJY: [HND CP 8] Handler success. Cleaning up.\n");
-    kfree(frm80211_msg->u.frm80211.u.frame.frame);
-    kfree(frm80211_msg);
+    //kfree(frm80211_msg->u.frm80211.u.frame.frame);
+    //kfree(frm80211_msg);
     return;
 
 oob_error_nested:
@@ -469,6 +513,7 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
     char *read_buff = NULL;
     ssize_t sz = 0;
 
+	printk("SJYC WRITE START size=%zu\n", size);
     /* [WR CP 1] Entry Point */
     printk("SJY: [WR CP 1] Entering %s. User buffer: %p, size: %zu\n", __func__, user_buffer, size);
 
@@ -821,6 +866,7 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer,
     u8 *s_tmp;
 	int list_count = 0;
 
+	printk("SJYC READ called\n");
     /* [RD CP 1] Entry Check */
     printk("SJY: [RD CP 1] Entering %s. User buffer: %p, available size: %zu\n", __func__, user_buffer, size);
     
