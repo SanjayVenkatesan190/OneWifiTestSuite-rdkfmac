@@ -498,9 +498,6 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     printk("SJY: [HND CP 7] Final ops type %d. Calling push_to_char_device\n", msg_ops_type);
     memcpy(&frm80211_msg->u.frm80211.ops, &msg_ops_type, sizeof(wlan_emu_cfg80211_ops_type_t));
     printk("SJYC PUSH start frame_len from %s\n", __func__);
-	printk("SJY TX frame=%p len=%u\n",
-       data->u.frm80211.u.frame.frame,
-       data->u.frm80211.u.frame.frame_len);
     push_to_char_device(frm80211_msg);
 
     /* [HND CP 8] Exit Cleanup */
