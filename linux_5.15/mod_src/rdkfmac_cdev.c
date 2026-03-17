@@ -84,6 +84,7 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	wlan_emu_msg_data_t	*spec;
 	char	str_spec_type[32] = {0};
 	char	str_ops[128] = {0};
+	unsigned int len = 0;
 
 	if (!data) { 
 		printk("SJY %s: ERR - Received NULL data\n", __func__); 
@@ -132,15 +133,20 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 	entry->spec = spec;
     printk("SJY %s: [CP 5] Before main memcpy. src=%p dest=%p\n", __func__, data, spec);
 	memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
+	spec->u.frm80211.u.frame.frame = NULL;
+
+        printk("SJY DEBUG type=%d frame_ptr=%p frame_len=%u\n", data->type,
+               data->u.frm80211.u.frame.frame,
+               data->u.frm80211.u.frame.frame_len);
 
         /* ===== FIX: deep copy frame buffer ===== */
         if (spec->type == wlan_emu_msg_type_frm80211 &&
             data->u.frm80211.u.frame.frame != NULL &&
             data->u.frm80211.u.frame.frame_len > 0) {
 
-          u32 len = data->u.frm80211.u.frame.frame_len;
+           len = data->u.frm80211.u.frame.frame_len;
 
-          if (len == 0 || len > 4096) {
+          if (len > 4096) {
             printk("SJY invalid frame length %u\n", len);
             kfree(spec);
             kfree(entry);
@@ -160,8 +166,14 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
         }
 
         printk("SJYC orig frame=%p copy frame=%p len=%u\n",
-               data->u.frm80211.u.frame.frame, spec->u.frm80211.u.frame.frame,
-               spec->u.frm80211.u.frame.frame_len);
+       data->u.frm80211.u.frame.frame,
+       spec->u.frm80211.u.frame.frame,
+       len);
+
+        if (data->type == wlan_emu_msg_type_frm80211)
+          kfree(data->u.frm80211.u.frame.frame);
+
+        kfree(data);
 
         printk("SJY: [CP 6] memcpy success and spec->type is %d\n", spec->type);
 
@@ -425,7 +437,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     f_len = frm80211_msg->u.frm80211.u.frame.frame_len;
     printk("SJY: [HND CP 4] Allocating frame buffer of size: %u\n", f_len);
     
-    if (f_len > 4000) { /* Sane limit check */
+    if (f_len == 0 || f_len > 4000) { /* Sane limit check */
         printk("SJY: [HND ERR] Insane frame length detected!\n");
         kfree(frm80211_msg);
         return;
@@ -486,6 +498,9 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     printk("SJY: [HND CP 7] Final ops type %d. Calling push_to_char_device\n", msg_ops_type);
     memcpy(&frm80211_msg->u.frm80211.ops, &msg_ops_type, sizeof(wlan_emu_cfg80211_ops_type_t));
     printk("SJYC PUSH start frame_len from %s\n", __func__);
+	printk("SJY TX frame=%p len=%u\n",
+       data->u.frm80211.u.frame.frame,
+       data->u.frm80211.u.frame.frame_len);
     push_to_char_device(frm80211_msg);
 
     /* [HND CP 8] Exit Cleanup */
