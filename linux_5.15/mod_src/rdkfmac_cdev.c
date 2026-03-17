@@ -136,7 +136,7 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 
     entry->spec = spec;
 
-    printk("SJY Before memcpy src=%p dst=%p size=%lu\n",
+    printk("SJY Before memcpy src=%p dst=%p size=%zu\n",
            data, spec, sizeof(wlan_emu_msg_data_t));
 
     memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
