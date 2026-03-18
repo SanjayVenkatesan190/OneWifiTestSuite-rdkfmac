@@ -237,18 +237,18 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     printk("SJY Message type resolved: %s ops=%s\n",
            str_spec_type, str_ops);
 
-    printk("SJY Queue before insert count=%d tail=%p\n",
-           get_list_entries_count_in_char_device(),
-           g_char_device.list_tail);
+    printk("SJY PUSH head=%p next=%p prev=%p\n",
+       &g_char_device.list_head,
+       g_char_device.list_head.next,
+       g_char_device.list_head.prev);
 
     /* Insert into queue */
-    list_add(&entry->list_entry, g_char_device.list_tail);
+    list_add_tail(&entry->list_entry, &g_char_device.list_head);
 
-    printk("SJY list_add done entry=%p\n", entry);
-
-    g_char_device.list_tail = &entry->list_entry;
-
-    printk("SJY list_tail updated to %p\n", g_char_device.list_tail);
+    printk("SJY PUSH AFTER head=%p next=%p prev=%p count=%u entry=%p\n",
+           &g_char_device.list_head, g_char_device.list_head.next,
+           g_char_device.list_head.prev,
+           get_list_entries_count_in_char_device(), entry);
 
     /* Wake reader */
     wake_up_interruptible(&rdkfmac_rq);
@@ -948,7 +948,6 @@ int init_rdkfmac_cdev(void)
 	}
 
 	INIT_LIST_HEAD(&g_char_device.list_head);
-	g_char_device.list_tail = &g_char_device.list_head;
 	printk(KERN_INFO "%s:%d: registered successfully\n", __func__, __LINE__);
 	g_char_device.tdev = MKDEV(RDKFMAC_MAJOR, 0);
 	g_char_device.dev = device_create(g_char_device.class, NULL,
@@ -966,38 +965,66 @@ void cleanup_rdkfmac_cdev(void)
 
 	printk(KERN_INFO "%s:%d: unregistered successfully\n", __func__, __LINE__);
 }
-
 unsigned int get_list_entries_count_in_char_device(void)
 {
-	unsigned count = 0;
-	struct list_head *ptr = &g_char_device.list_head;
+    unsigned int count = 0;
+    struct list_head *pos;
 
-	for (ptr = &g_char_device.list_head; ptr != g_char_device.list_tail; ptr = ptr->next) {
-		count++;
-	}
+    list_for_each(pos, &g_char_device.list_head) {
 
-	return count;
+        if (!pos || !pos->next || !pos->prev) {
+            printk("SJY LIST CORRUPTION DETECTED pos=%p\n", pos);
+            break;
+        }
+
+        count++;
+
+        /* safety guard to avoid infinite loop */
+        if (count > 10000) {
+            printk("SJY LIST LOOP DETECTED!\n");
+            break;
+        }
+    }
+
+    return count;
 }
 
-wlan_emu_msg_data_t*pop_from_char_device(void)
+wlan_emu_msg_data_t *pop_from_char_device(void)
 {
-	wlan_emu_msg_data_t *spec = NULL;
-	wlan_emu_msg_data_entry_t *entry = NULL;
+    wlan_emu_msg_data_entry_t *entry;
+    wlan_emu_msg_data_t *spec;
 
-	if (g_char_device.list_tail == &g_char_device.list_head) {
-		printk("%s:%d list is empty\n", __func__, __LINE__);
-		return NULL;
-	}
+    if (list_empty(&g_char_device.list_head)) {
+        printk("%s: list is empty\n", __func__);
+        return NULL;
+    }
 
-	entry = list_entry(g_char_device.list_tail, wlan_emu_msg_data_entry_t, list_entry);
+	printk("SJY POP before count=%u head=%p next=%p prev=%p\n",
+           get_list_entries_count_in_char_device(),
+           &g_char_device.list_head,
+           g_char_device.list_head.next,
+           g_char_device.list_head.prev);
 
-	g_char_device.list_tail= g_char_device.list_tail->prev;
-	list_del(&entry->list_entry);
+    /* Get first entry */
+    entry = list_first_entry(&g_char_device.list_head,
+                             wlan_emu_msg_data_entry_t,
+                             list_entry);
 
-	spec = entry->spec;
-	kfree(entry);
+    list_del(&entry->list_entry);
 
-	return spec;
+    spec = entry->spec;
+
+	printk("SJY POP after delete count=%u head->next=%p head->prev=%p\n",
+           get_list_entries_count_in_char_device(),
+           g_char_device.list_head.next,
+           g_char_device.list_head.prev);
+
+
+    printk("SJY POP entry=%p spec=%p\n", entry, spec);
+
+    kfree(entry);
+
+    return spec;
 }
 
 struct rdkfmac_device_data *get_char_device_data(void)
