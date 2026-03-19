@@ -422,6 +422,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     const unsigned char rfc1042_hdr[ETH_ALEN] = { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00 };
     unsigned char *tmp_frame_buf;
     unsigned int data_header_len = 0;
+	unsigned int f_len = 0;
     size_t rem_size = size; /* TRACK REMAINING BYTES */
 
     /* 1. Header Validation */
@@ -462,7 +463,7 @@ static void handle_frm80211_msg_w(char *read_buff, size_t size) {
     rem_size -= ETH_ALEN;
 
     /* 2. CRITICAL FIX: Validate the internal Frame Length */
-    unsigned int f_len = frm80211_msg->u.frm80211.u.frame.frame_len;
+    f_len = frm80211_msg->u.frm80211.u.frame.frame_len;
     
     if (f_len == 0 || f_len > rem_size || f_len > 4096) {
         printk("SJY ERROR: Malformed frame length %u (Remaining buffer: %zu)\n", f_len, rem_size);
