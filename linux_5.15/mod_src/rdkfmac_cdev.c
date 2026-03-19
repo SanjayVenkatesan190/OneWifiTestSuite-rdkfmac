@@ -935,6 +935,7 @@ static int rdkfmac_open(struct inode *inode, struct file *file)
 
 static int rdkfmac_release(struct inode *inode, struct file *file)
 {
+	unsigned long flags;
 	if (g_char_device.num_inst > 0) {
 		spin_lock_irqsave(&g_char_device_list_lock, flags);
 		g_char_device.num_inst--;
