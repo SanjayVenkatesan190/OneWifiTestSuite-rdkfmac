@@ -569,14 +569,14 @@ static ssize_t rdkfmac_write(struct file *file, const char __user *user_buffer,
         printk("%s:%d: kmalloc failed\n", __func__, __LINE__);
         kfree(pSpec);
         kfree(read_buff);
-        return 0;
+        return -ENOMEM;
     }
 
     if (copy_from_user(read_buff, user_buffer, size)) {
         printk("%s:%d: copy_from_user error\n", __func__, __LINE__);
         kfree(pSpec);
         kfree(read_buff);
-        return 0;
+        return -EFAULT;
     }
 
     /* Identify type safely */
