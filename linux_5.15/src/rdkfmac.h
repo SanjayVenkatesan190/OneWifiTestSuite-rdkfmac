@@ -158,7 +158,6 @@ typedef struct rdkfmac_device_data {
 	struct class*class;
 	struct device* dev;
 	struct list_head list_head;
-	struct list_head *list_tail;
 	dev_t	tdev;
 	signed int num_inst;
 } rdkfmac_device_data_t;
