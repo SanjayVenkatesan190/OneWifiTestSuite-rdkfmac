@@ -88,15 +88,16 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
     char str_ops[128] = {0};
     u32 len = 0;
     unsigned long flags;
+    wlan_emu_msg_type_t type;
+    unsigned int frame_len = 0;
+    void *frame_ptr = NULL;
 
     /* Avoid unused-variable warnings */
     (void)len;
     (void)str_ops;
 
     /* 🔥 Snapshot variables (C90 compliant) */
-    wlan_emu_msg_type_t type;
-    unsigned int frame_len = 0;
-    void *frame_ptr = NULL;
+    
 
     printk("SJY ENTER %s data=%p\n", __func__, data);
 
