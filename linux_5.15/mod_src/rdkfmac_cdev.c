@@ -889,6 +889,7 @@ void handle_agent_msg(wlan_emu_msg_data_t *spec, ssize_t *len, u8 *s_tmp)
 
 	return;
 }
+
 static void handle_frame(wlan_emu_msg_data_t *spec,
                          ssize_t *len,
                          u8 *s_tmp,
@@ -992,7 +993,13 @@ static void handle_frame(wlan_emu_msg_data_t *spec,
     s_tmp += sizeof(unsigned int);
     *len += sizeof(unsigned int);
 
-    /* 🔥 FIX: Copy MAC FIRST (instead of payload) */
+    memcpy(s_tmp,
+           spec->u.frm80211.u.frame.frame,
+           spec->u.frm80211.u.frame.frame_len);
+    s_tmp += spec->u.frm80211.u.frame.frame_len;
+    *len += spec->u.frm80211.u.frame.frame_len;
+
+    /* THEN copy MACs */
     memcpy(s_tmp,
            spec->u.frm80211.u.frame.macaddr,
            ETH_ALEN);
@@ -1004,13 +1011,6 @@ static void handle_frame(wlan_emu_msg_data_t *spec,
            ETH_ALEN);
     s_tmp += ETH_ALEN;
     *len += ETH_ALEN;
-
-    /* 5. Copy frame payload (MOVED TO END) */
-    memcpy(s_tmp,
-           spec->u.frm80211.u.frame.frame,
-           spec->u.frm80211.u.frame.frame_len);
-    s_tmp += spec->u.frm80211.u.frame.frame_len;
-    *len += spec->u.frm80211.u.frame.frame_len;
 
     printk("SJY_PROGRESS after payload len=%zd\n", *len);
 
