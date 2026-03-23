@@ -79,27 +79,28 @@ static unsigned int rdkfmac_poll(struct file *filp, struct poll_table_struct *wa
 
 	return mask;
 }
+
 void push_to_char_device(wlan_emu_msg_data_t *data)
 {
     wlan_emu_msg_data_entry_t *entry = NULL;
     wlan_emu_msg_data_t *spec = NULL;
-
     char str_spec_type[32] = {0};
     char str_ops[128] = {0};
-
     u32 len = 0;
     unsigned long flags;
 
-    /* 🔥 Local snapshot variables (C90: declared at top) */
+    /* Avoid unused-variable warnings */
+    (void)len;
+    (void)str_ops;
+
+    /* 🔥 Snapshot variables (C90 compliant) */
     wlan_emu_msg_type_t type;
     unsigned int frame_len = 0;
     void *frame_ptr = NULL;
 
     printk("SJY ENTER %s data=%p\n", __func__, data);
 
-    /* ================================
-     * 🔥 UAF DETECTION
-     * ================================ */
+    /* 🔥 UAF DETECTION */
     if (data == last_freed_spec) {
         printk("SJY_UAF_CONFIRMED: reused freed pointer=%p\n", data);
         return;
@@ -111,21 +112,33 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
         return;
     }
 
-    /* ================================
-     * 🔥 SAFE SNAPSHOT (avoid race/UAF)
-     * ================================ */
+    /* 🔥 SAFE SNAPSHOT */
     type = data->type;
-
     if (type == wlan_emu_msg_type_frm80211) {
         frame_len = data->u.frm80211.u.frame.frame_len;
         frame_ptr = data->u.frm80211.u.frame.frame;
     }
 
-    printk("SJY_PUSH spec=%p type=%d frame_len=%u frame_ptr=%p\n",
-           data, type, frame_len, frame_ptr);
+    printk("SJY_PUSH spec=%p type=%d frame_len=%u frame_ptr=%p\n", data,
+           data->type,
+           (data->type == wlan_emu_msg_type_frm80211)
+               ? data->u.frm80211.u.frame.frame_len
+               : 0,
+           (data->type == wlan_emu_msg_type_frm80211)
+               ? data->u.frm80211.u.frame.frame
+               : NULL);
+
+    printk("SJY DEBUG: type=%d frame=%p len=%u\n",
+           data->type,
+           data->u.frm80211.u.frame.frame,
+           data->u.frm80211.u.frame.frame_len);
+
+    printk("SJY DEBUG: listeners=%d emu_close=%d\n",
+           g_char_device.num_inst,
+           rdkfmac_emu80211_close);
 
     /* 🔥 POISON CHECK */
-    if (type == 0xDEDEDEDE) {
+    if ((unsigned int)type == 0xDEDEDEDE) {
         printk("SJY_POISON_HIT: data already freed %p\n", data);
         return;
     }
@@ -142,102 +155,150 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
         return;
     }
 
-    /* ================================
-     * ✅ Allocate entry
-     * ================================ */
-    entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
+    /* Allocate entry */
+    printk("SJY Allocating entry struct\n");
+    entry = kmalloc(sizeof(wlan_emu_msg_data_entry_t), GFP_ATOMIC);
     if (!entry) {
-        printk("SJY ERROR: entry alloc failed\n");
+        printk("SJY ERROR: kmalloc failed for entry\n");
         return;
     }
+    printk("SJY entry allocated %p\n", entry);
 
-    /* ================================
-     * ✅ Allocate spec
-     * ================================ */
-    spec = kmalloc(sizeof(*spec), GFP_ATOMIC);
+    /* Allocate spec */
+    printk("SJY Allocating spec struct\n");
+    spec = kmalloc(sizeof(wlan_emu_msg_data_t), GFP_ATOMIC);
     if (!spec) {
-        printk("SJY ERROR: spec alloc failed\n");
+        printk("SJY ERROR: kmalloc failed for spec\n");
         kfree(entry);
         return;
     }
+    printk("SJY spec allocated %p\n", spec);
 
     entry->spec = spec;
 
-    /* ================================
-     * ✅ STRUCT COPY
-     * ================================ */
-    memcpy(spec, data, sizeof(*spec));
+    printk("SJY Before memcpy src=%p dst=%p size=%zu\n",
+           data, spec, sizeof(wlan_emu_msg_data_t));
 
-    /* 🔥 CRITICAL: break shallow pointer */
+    memcpy(spec, data, sizeof(wlan_emu_msg_data_t));
+
+    /* prevent shallow pointer copy */
     spec->u.frm80211.u.frame.frame = NULL;
 
-    /* ================================
-     * ✅ DEEP COPY FRAME
-     * ================================ */
+    printk("SJY After memcpy spec->type=%d\n", spec->type);
+
+    /* ===== Deep copy frame buffer ===== */
     if (type == wlan_emu_msg_type_frm80211 &&
         frame_ptr != NULL &&
         frame_len > 0) {
 
-        if (frame_len > 4096) {
-            printk("SJY ERROR: invalid frame length %u\n", frame_len);
+        len = frame_len;
+
+        printk("SJY Deep copy triggered len=%u\n", len);
+
+        /* 🔥 CRITICAL FIX */
+        spec->u.frm80211.u.frame.frame_len = frame_len;
+
+        if (len > 4096) {
+            printk("SJY ERROR: invalid frame length %u\n", len);
             kfree(spec);
             kfree(entry);
             return;
         }
 
-        spec->u.frm80211.u.frame.frame =
-            kmalloc(frame_len, GFP_ATOMIC);
+        spec->u.frm80211.u.frame.frame = kmalloc(len, GFP_ATOMIC);
 
         if (!spec->u.frm80211.u.frame.frame) {
-            printk("SJY ERROR: frame alloc failed\n");
+            printk("SJY ERROR: frame buffer allocation failed\n");
             kfree(spec);
             kfree(entry);
             return;
         }
+
+        printk("SJY frame buffer allocated %p\n",
+               spec->u.frm80211.u.frame.frame);
 
         memcpy(spec->u.frm80211.u.frame.frame,
                frame_ptr,
+               len);
+
+        printk("SJY frame memcpy done\n");
+    }
+    else {
+        printk("SJY Deep copy skipped type=%d frame=%p len=%u\n",
+               spec->type,
+               frame_ptr,
                frame_len);
 
-        printk("SJY FRAME COPY orig=%p new=%p len=%u\n",
-               frame_ptr,
-               spec->u.frm80211.u.frame.frame,
-               frame_len);
-    } else {
         spec->u.frm80211.u.frame.frame = NULL;
         spec->u.frm80211.u.frame.frame_len = 0;
     }
 
-    /* ================================
-     * TYPE DEBUG
-     * ================================ */
-    switch (type) {
+    printk("SJY Frame debug orig=%p copy=%p len=%u\n",
+           frame_ptr,
+           spec->u.frm80211.u.frame.frame,
+           spec->u.frm80211.u.frame.frame_len);
+
+    /* Identify message type */
+    switch (spec->type) {
+
+    case wlan_emu_msg_type_cfg80211:
+        strcpy(str_spec_type, "cfg80211");
+        printk("SJY cfg80211 ops=%d\n", spec->u.cfg80211.ops);
+        strcpy(str_ops,
+               rdkfmac_cfg80211_ops_type_to_string(spec->u.cfg80211.ops));
+        break;
+
+    case wlan_emu_msg_type_mac80211:
+        strcpy(str_spec_type, "mac80211");
+        printk("SJY mac80211 ops=%d\n", spec->u.mac80211.ops);
+        strcpy(str_ops,
+               rdkfmac_mac80211_ops_type_to_string(spec->u.mac80211.ops));
+        break;
+
+    case wlan_emu_msg_type_emu80211:
+        strcpy(str_spec_type, "emu80211");
+        printk("SJY emu80211 ops=%d\n", spec->u.emu80211.ops);
+        strcpy(str_ops,
+               rdkfmac_emu80211_ops_type_to_string(spec->u.emu80211.ops));
+        break;
+
+    case wlan_emu_msg_type_webconfig:
+        strcpy(str_spec_type, "webconfig");
+        strcpy(str_ops, "onewifi_webconfig");
+        break;
+
+    case wlan_emu_msg_type_agent:
+        strcpy(str_spec_type, "agent");
+        break;
+
     case wlan_emu_msg_type_frm80211:
         strcpy(str_spec_type, "frm80211");
         break;
-    case wlan_emu_msg_type_cfg80211:
-        strcpy(str_spec_type, "cfg80211");
-        break;
-    case wlan_emu_msg_type_mac80211:
-        strcpy(str_spec_type, "mac80211");
-        break;
+
     default:
-        strcpy(str_spec_type, "other");
+        strcpy(str_spec_type, "unknown");
         break;
     }
 
-    printk("SJY Message type: %s\n", str_spec_type);
+    printk("SJY Message type resolved: %s ops=%s\n",
+           str_spec_type, str_ops);
 
-    /* ================================
-     * 🔒 CRITICAL SECTION
-     * ================================ */
+    printk("SJY Queue before insert count=%d tail=%p\n",
+           get_list_entries_count_in_char_device(),
+           g_char_device.list_head.prev);
+
     spin_lock_irqsave(&g_char_device_list_lock, flags);
 
     if (g_char_device.num_inst == 0 || rdkfmac_emu80211_close) {
         spin_unlock_irqrestore(&g_char_device_list_lock, flags);
 
-        if (spec->u.frm80211.u.frame.frame)
+        if (spec->type == wlan_emu_msg_type_frm80211 &&
+            spec->u.frm80211.u.frame.frame) {
             kfree(spec->u.frm80211.u.frame.frame);
+        }
+
+        /* 🔥 UAF TRACKING */
+        last_freed_spec = spec;
 
         kfree(spec);
         kfree(entry);
@@ -246,17 +307,16 @@ void push_to_char_device(wlan_emu_msg_data_t *data)
 
     list_add_tail(&entry->list_entry, &g_char_device.list_head);
 
+    printk("SJY list_add done entry=%p\n", entry);
+    printk("SJY list_tail updated to %p\n", g_char_device.list_head.prev);
+
     spin_unlock_irqrestore(&g_char_device_list_lock, flags);
 
-    /* ================================
-     * WAKEUP
-     * ================================ */
     wake_up_interruptible(&rdkfmac_rq);
 
-    printk("SJY EXIT %s success entry=%p spec=%p\n",
-           __func__, entry, spec);
+    printk("SJY wake_up_interruptible called\n");
+    printk("SJY EXIT %s success\n", __func__);
 }
-
 void push_to_rdkfmac_device(wlan_emu_msg_data_t *data)
 {
 	unsigned char *cmd_buffer;
