@@ -892,7 +892,9 @@ int init_rdkfmac_cdev(void)
 	}
 
 	memset(&g_char_device, 0, sizeof(rdkfmac_device_data_t));
-
+    INIT_LIST_HEAD(&g_char_device.list_head);
+	g_char_device.list_tail = &g_char_device.list_head;
+    spin_lock_init(&g_char_device.lock);
 	cdev_init(&g_char_device.cdev, &rdkfmac_fops);
 	cdev_add(&g_char_device.cdev, MKDEV(RDKFMAC_MAJOR, 0), 1);
 	g_char_device.class = class_create(THIS_MODULE, RDKFMAC_CLASS_NAME);
@@ -900,10 +902,6 @@ int init_rdkfmac_cdev(void)
 		printk(KERN_ALERT "cdrv : register device class failed\n");
 		return PTR_ERR(g_char_device.class);
 	}
-
-	INIT_LIST_HEAD(&g_char_device.list_head);
-	g_char_device.list_tail = &g_char_device.list_head;
-	spin_lock_init(&g_char_device_list_lock);
 	printk(KERN_INFO "%s:%d: registered successfully\n", __func__, __LINE__);
 	g_char_device.tdev = MKDEV(RDKFMAC_MAJOR, 0);
 	g_char_device.dev = device_create(g_char_device.class, NULL,
