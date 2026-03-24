@@ -894,7 +894,7 @@ int init_rdkfmac_cdev(void)
 	memset(&g_char_device, 0, sizeof(rdkfmac_device_data_t));
     INIT_LIST_HEAD(&g_char_device.list_head);
 	g_char_device.list_tail = &g_char_device.list_head;
-    spin_lock_init(&g_char_device.lock);
+    spin_lock_init(&g_char_device_list_lock);
 	cdev_init(&g_char_device.cdev, &rdkfmac_fops);
 	cdev_add(&g_char_device.cdev, MKDEV(RDKFMAC_MAJOR, 0), 1);
 	g_char_device.class = class_create(THIS_MODULE, RDKFMAC_CLASS_NAME);
