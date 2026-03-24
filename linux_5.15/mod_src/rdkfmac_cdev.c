@@ -8,6 +8,7 @@ struct rdkfmac_device_data g_char_device;
 static DECLARE_WAIT_QUEUE_HEAD(rdkfmac_rq); 
 static wlan_emu_msg_data_t *pop_from_char_device(void);
 static unsigned int get_list_entries_count_in_char_device(void);
+static spinlock_t g_char_device_list_lock;
 static bool  rdkfmac_emu80211_close = true;
 
 const char *rdkfmac_cfg80211_ops_type_to_string(wlan_emu_cfg80211_ops_type_t type)
@@ -839,24 +840,35 @@ static ssize_t rdkfmac_read(struct file *file, char __user *user_buffer, size_t 
     printk("SJY_READ_EXIT: Returning %zd to userspace\n", return_len);
     return return_len;
 }
-
 static int rdkfmac_open(struct inode *inode, struct file *file)
 {
+    unsigned long flags;
+    
+    spin_lock_irqsave(&g_char_device_list_lock, flags);
+    g_char_device.num_inst++;
+    spin_unlock_irqrestore(&g_char_device_list_lock, flags);
 
-	g_char_device.num_inst++;
-	printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
-
-	return 0;
+    printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
+    return 0;
 }
 
 static int rdkfmac_release(struct inode *inode, struct file *file)
 {
-	if (g_char_device.num_inst > 0) {
-		g_char_device.num_inst--;
-	}
+    unsigned long flags;
+    
+    spin_lock_irqsave(&g_char_device_list_lock, flags);
+    if (g_char_device.num_inst > 0) {
+        g_char_device.num_inst--;
+    }
+    
+    /* Clean up the tail pointer if nobody is listening anymore */
+    if (g_char_device.num_inst == 0) {
+        g_char_device.list_tail = &g_char_device.list_head; 
+    }
+    spin_unlock_irqrestore(&g_char_device_list_lock, flags);
 
-		printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
-		return 0;
+    printk(KERN_INFO "%s:%d Opened Instances: %d\n", __func__, __LINE__, g_char_device.num_inst);
+    return 0;
 }
 
 const struct file_operations rdkfmac_fops = {
@@ -891,6 +903,7 @@ int init_rdkfmac_cdev(void)
 
 	INIT_LIST_HEAD(&g_char_device.list_head);
 	g_char_device.list_tail = &g_char_device.list_head;
+	spin_lock_init(&g_char_device_list_lock);
 	printk(KERN_INFO "%s:%d: registered successfully\n", __func__, __LINE__);
 	g_char_device.tdev = MKDEV(RDKFMAC_MAJOR, 0);
 	g_char_device.dev = device_create(g_char_device.class, NULL,
@@ -911,16 +924,20 @@ void cleanup_rdkfmac_cdev(void)
 
 unsigned int get_list_entries_count_in_char_device(void)
 {
-	unsigned count = 0;
-	struct list_head *ptr = &g_char_device.list_head;
+    unsigned count = 0;
+    struct list_head *ptr;
+    unsigned long flags;
 
-	for (ptr = &g_char_device.list_head; ptr != g_char_device.list_tail; ptr = ptr->next) {
-		count++;
-	}
+    /* CRITICAL: Lock the list before walking it */
+    spin_lock_irqsave(&g_char_device_list_lock, flags);
+    for (ptr = &g_char_device.list_head; ptr != g_char_device.list_tail; ptr = ptr->next) {
+        count++;
+        if (count > 1000) break; /* Safety Break to prevent CPU hangs */
+    }
+    spin_unlock_irqrestore(&g_char_device_list_lock, flags);
 
-	return count;
+    return count;
 }
-
 wlan_emu_msg_data_t *pop_from_char_device(void)
 {
     wlan_emu_msg_data_t *spec = NULL;
@@ -934,7 +951,7 @@ wlan_emu_msg_data_t *pop_from_char_device(void)
     
     if (g_char_device.list_tail == &g_char_device.list_head) {
         spin_unlock_irqrestore(&g_char_device_list_lock, flags);
-        printk("SJY_POP_EMPTY: list_tail == list_head (%p). Queue is empty.\n", g_char_device.list_head);
+        printk("SJY_POP_EMPTY: list_tail == list_head (%p). Queue is empty.\n", &g_char_device.list_head);
         return NULL;
     }
 
