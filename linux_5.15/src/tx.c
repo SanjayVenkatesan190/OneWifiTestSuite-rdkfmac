@@ -1784,7 +1784,6 @@ int send_data_frame(void *buff, uint32_t frame_size, struct ieee80211_hw *hw)
 	printk("no such device eth0\n");
 	return 1;
 	}
-
 	skb = alloc_skb(ETH_HLEN + frame_size + sizeof(u8aRadiotapHeader), GFP_ATOMIC);
 
 	if (skb == NULL) {
@@ -1802,6 +1801,7 @@ int send_data_frame(void *buff, uint32_t frame_size, struct ieee80211_hw *hw)
 	memcpy(data + 15, &rssi, 1);
 	memcpy(data + 16, &noise, 1);
 	memcpy(data + sizeof(u8aRadiotapHeader), buff, frame_size);
+
 
 	eth = (struct ethhdr*)skb_push(skb, sizeof (struct ethhdr));
 	skb_reset_mac_header(skb);
@@ -1857,6 +1857,7 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 	hdr = (void *)tx.skb->data;
 	if (ieee80211_is_data_qos(hdr->frame_control) &&
 		!ieee80211_is_qos_nullfunc(hdr->frame_control)) {
+		printk("SJY send_data_frame called from ieee80211_tx\n");
 		send_data_frame(skb->data, skb->len, &local->hw);
 	}
 
@@ -2192,6 +2193,7 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 	struct cfg80211_chan_def *chandef;
 	u16 len_rthdr;
 	int hdrlen;
+	u8 *payload;
 
 	memset(info, 0, sizeof(*info));
 	info->flags = IEEE80211_TX_CTL_REQ_TX_STATUS |
@@ -2233,7 +2235,7 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 	 */
 	if (ieee80211_is_data(hdr->frame_control) &&
 	    skb->len >= len_rthdr + hdrlen + sizeof(rfc1042_header) + 2) {
-		u8 *payload = (u8 *)hdr + hdrlen;
+		payload = (u8 *)hdr + hdrlen;
 
 		if (ether_addr_equal(payload, rfc1042_header))
 			skb->protocol = cpu_to_be16((payload[6] << 8) |
