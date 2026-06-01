@@ -1779,15 +1779,16 @@ int send_data_frame(void *buff, uint32_t frame_size, struct ieee80211_hw *hw)
 	static int rssi, noise;
 	struct mac80211_rdkfmac_data *rdkfmac_data = hw->priv;
 
+	printk("SJY Entering send_data_frame \n");
 	dev = dev_get_by_name(&init_net, rdkfmac_data->bridge_name);
 	if (dev == NULL ) {
-	printk("no such device eth0\n");
+	printk("SJY no such device eth0\n");
 	return 1;
 	}
 	skb = alloc_skb(ETH_HLEN + frame_size + sizeof(u8aRadiotapHeader), GFP_ATOMIC);
 
 	if (skb == NULL) {
-	printk("failed alloc skb\n");
+	printk("SJY failed alloc skb\n");
 	return 1;
 	}
 
@@ -1801,6 +1802,7 @@ int send_data_frame(void *buff, uint32_t frame_size, struct ieee80211_hw *hw)
 	memcpy(data + 15, &rssi, 1);
 	memcpy(data + 16, &noise, 1);
 	memcpy(data + sizeof(u8aRadiotapHeader), buff, frame_size);
+	printk("SJY Data is put in skb\n");
 
 
 	eth = (struct ethhdr*)skb_push(skb, sizeof (struct ethhdr));
@@ -1809,9 +1811,9 @@ int send_data_frame(void *buff, uint32_t frame_size, struct ieee80211_hw *hw)
 	skb->protocol = eth->h_proto = htons(9002);
 	memcpy(eth->h_source, dev->dev_addr, ETH_ALEN);
 	memcpy(eth->h_dest, mac_addr, ETH_ALEN);
-
 	skb->dev = dev;
 	dev_queue_xmit(skb);
+	printk("SJY Data is transmitted and returning 0 \n");
 
 	return 0;
 }
@@ -1830,8 +1832,10 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_hdr *hdr;
 	bool result = true;
 
+	printk("SJY Entering ieee80211_tx \n");
 	if (unlikely(skb->len < 10)) {
 		dev_kfree_skb(skb);
+		printk("SJY SKB length is less than 10 \n");
 		return true;
 	}
 
@@ -1840,8 +1844,10 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 
 	if (unlikely(res_prepare == TX_DROP)) {
 		ieee80211_free_txskb(&local->hw, skb);
+		printk("SJY TX_DROP and returning 1\n");
 		return true;
 	} else if (unlikely(res_prepare == TX_QUEUED)) {
+		printk("SJY TX_QUEUED and returning 1\n");
 		return true;
 	}
 
@@ -1851,8 +1857,10 @@ static bool ieee80211_tx(struct ieee80211_sub_if_data *sdata,
 		info->hw_queue =
 			sdata->vif.hw_queue[skb_get_queue_mapping(skb)];
 
-	if (invoke_tx_handlers_early(&tx))
+	if (invoke_tx_handlers_early(&tx)) {
+		printk("SJY invoke_tx_handlers_early and returning 1\n");
 		return true;
+	}
 
 	hdr = (void *)tx.skb->data;
 	if (ieee80211_is_data_qos(hdr->frame_control) &&
@@ -1924,6 +1932,8 @@ void ieee80211_xmit(struct ieee80211_sub_if_data *sdata,
 	int headroom;
 	enum ieee80211_encrypt encrypt;
 
+	printk("SJY Entering ieee80211_xmit \n");
+
 	if (info->flags & IEEE80211_TX_INTFL_DONT_ENCRYPT)
 		encrypt = ENCRYPT_NO;
 	else if (ieee80211_is_mgmt(hdr->frame_control))
@@ -1957,6 +1967,7 @@ void ieee80211_xmit(struct ieee80211_sub_if_data *sdata,
 	}
 
 	ieee80211_set_qos_hdr(sdata, skb);
+	printk("SJY ieee80211_tx called\n");
 	ieee80211_tx(sdata, sta, skb, false);
 }
 
@@ -2195,6 +2206,8 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 	int hdrlen;
 	u8 *payload;
 
+	printk("SJY Entering ieee80211_monitor_start_xmit \n");
+
 	memset(info, 0, sizeof(*info));
 	info->flags = IEEE80211_TX_CTL_REQ_TX_STATUS |
 		      IEEE80211_TX_CTL_INJECTED;
@@ -2324,7 +2337,7 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 
 	/* remove the injection radiotap header */
 	skb_pull(skb, len_rthdr);
-
+    printk("SJY ieee80211_xmit calling from ieee80211_monitor_start_xmit\n");
 	ieee80211_xmit(sdata, NULL, skb);
 	rcu_read_unlock();
 
